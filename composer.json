@@ -1,0 +1,35 @@
+{
+    "name": "natpnk/microsoft-graph-laravel",
+    "description": "Microsoft Graph wrapper and mail transport for Laravel.",
+    "require": {
+        "php": "^7.2.5|^8.0",   
+        "ext-json": "*",
+        "illuminate/support": "^8.0",
+        "illuminate/mail": "^8.0",
+        "guzzlehttp/guzzle": "^7.3.0",
+        "microsoft/microsoft-graph": "^1.30.0"
+    },
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Natpnk\\MicrosoftGraphLaravel\\": "src"
+        }
+    },
+    "extra": {
+        "laravel": {            
+            "providers": [
+                "Natpnk\\MicrosoftGraphLaravel\\MicrosoftGraphServiceProvider"
+            ],
+
+            "aliases": {
+                "MicrosoftGraph": "Natpnk\\MicrosoftGraphLaravel\\MicrosoftGraphFacade"
+            }
+        }
+    },    
+    "authors": [
+        {
+            "name": "Natpnk",
+            "email": "patrick@natpnk.nl"
+        }
+    ]
+}
