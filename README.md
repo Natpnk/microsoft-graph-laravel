@@ -15,7 +15,7 @@ To install and use this package follow instructions below:
 
 #### Step 1: Install via composer
 
-> $ composer require natpnk/microsoft-graph-laravel
+    $ composer require natpnk/microsoft-graph-laravel
 
 #### Step 2: Publish config
 
