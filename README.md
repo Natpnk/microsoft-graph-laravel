@@ -1,6 +1,6 @@
 # Microsoft Graph for Laravel
 
-This laravel package contains a wrappr for Microsoft Graph with the following features:
+This laravel package contains a wrapper for Microsoft Graph with the following features:
 
  - Microsoft Graph API calls
  - Mail transport
@@ -65,7 +65,7 @@ A basic example usage example get's all the users from a tentant:
 for futher documentation about usage consult: [Microsoft Graph API docs](https://docs.microsoft.com/en-us/graph/overview)
 
 ## Inspiration
-The inspiration for this package came from [wapacro/laravel-msgraph-mail](https://github.com/wapacro/laravel-msgraph-mail) and the search for a wrapper for Microsoft Graph to use in Laravel.  
+The inspiration for this package came from [wapacro/laravel-msgraph-mail](https://github.com/wapacro/laravel-msgraph-mail) and the need for a wrapper for Microsoft Graph to use in Laravel.  
 
 ## Contributing
 Feel free contribute and send pull requests.
