@@ -4,8 +4,8 @@
     "require": {
         "php": "^7.2.5|^8.0",   
         "ext-json": "*",
-        "illuminate/support": "^8.0",
-        "illuminate/mail": "^8.0",
+        "illuminate/support": "^8.0|^9.0",        
+        "illuminate/mail": "^8.0|^9.0",
         "guzzlehttp/guzzle": "^7.3.0",
         "microsoft/microsoft-graph": "^1.30.0"
     },
