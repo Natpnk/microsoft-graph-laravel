@@ -1,123 +1,72 @@
 <?php
 
-
 namespace Natpnk\MicrosoftGraphLaravel;
 
-use Exception;
-use GuzzleHttp\Client;
-use GuzzleHttp\ClientInterface;
-use GuzzleHttp\Exception\BadResponseException;
-use GuzzleHttp\Exception\ConnectException;
-use Illuminate\Mail\Transport\Transport;
+use MicrosoftGraph;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+
+use Symfony\Component\Mailer\Header\MetadataHeader;
+use Symfony\Component\Mailer\SentMessage;
+use Symfony\Component\Mailer\Transport\AbstractTransport;
+use Symfony\Component\Mime\Message;
+use Symfony\Component\Mime\Address;
+use Symfony\Component\Mime\Email;
+use Symfony\Component\Mime\MessageConverter;
+
 use Natpnk\MicrosoftGraphLaravel\Exceptions\CouldNotGetToken;
 use Natpnk\MicrosoftGraphLaravel\Exceptions\CouldNotReachService;
 use Natpnk\MicrosoftGraphLaravel\Exceptions\CouldNotSendMail;
-use Swift_Mime_Attachment;
-use Swift_Mime_EmbeddedFile;
-use Swift_Mime_SimpleMessage;
 
-class MicrosoftGraphMailTransport extends Transport {
+class MicrosoftGraphMailTransport extends AbstractTransport {
 
     /**
-     * @var string
+     * The MicrosoftGraph client.
+     *
+     * @var MicrosoftGraph
      */
-    protected string $Endpoint = 'https://graph.microsoft.com/v1.0/users/{from}/sendMail';
+    protected $Graph;
 
     /**
-     * @var array
+     * Create a new MicrosoftGraph transport instance.
+     *
+     * @param  $Config
+     * @return void
      */
-    protected array $Config;
-
-    /**
-     * @var Client|ClientInterface
-     */
-    protected ClientInterface $http;
-
-    /**
-     * MsGraphMailTransport constructor
-     * @param array $Config
-     * @param ClientInterface|null $client
-     */
-    public function __construct(array $Config, ClientInterface $Client = null){
+    public function __construct(array $Config = []){
         
-        $this->Config = $Config;
-        
-        $this->Client = $Client ?? new Client();
+        $this->Config = $Config;        
+        $this->Graph = new MicrosoftGraph;
     }
 
-    /**
-     * Send given email message
-     * @param Swift_Mime_SimpleMessage $message
-     * @param null $failedRecipients
-     * @return int
-     * @throws CouldNotSendMail
-     * @throws CouldNotReachService
-     * @throws CouldNotGetToken
-     */
-    public function send(Swift_Mime_SimpleMessage $Message, &$failedRecipients = null){
-        
-        $this->beforeSendPerformed($Message);
-        
-        $Payload = $this->getPayload($Message);
-        
-        $url = str_replace('{from}', urlencode($Payload['from']['emailAddress']['address']), $this->Endpoint);
+    protected function doSend(SentMessage $Message): void {
+                
+        $From = $Message->getEnvelope()->getSender()->toString();
 
-        try {
-            
-            $this->Client->post($url, [
-                'headers' => $this->getHeaders(),
-                'json' => [
-                    'message' => $Payload,
-                ],
-            ]);
-
-            $this->sendPerformed($Message);
-            return $this->numberOfRecipients($Message);
-        
-        } catch (BadResponseException $Exception) {
-        
-            // The API responded with 4XX or 5XX error
-            $Response = json_decode((string)$Exception->getResponse()->getBody());
-            throw CouldNotSendMail::serviceRespondedWithError($Response->error->code, $Response->error->message);
-       
-        } catch (ConnectException $Exception) {
-        
-            // A connection error (DNS, timeout, ...) occurred
-            throw CouldNotReachService::networkError();
-        }
+        MicrosoftGraph::createRequest("POST", "/users/{$From}/sendmail")->attachBody($this->getBody($Message))->execute();
     }
 
-    /**
-     * Transforms given SwiftMailer message instance into
-     * Microsoft Graph message object
-     * @param Swift_Mime_SimpleMessage $message
-     * @return array
-     */
-    protected function getPayload(Swift_Mime_SimpleMessage $Message){
-        
-        $From = $Message->getFrom();
-        $Priority = $Message->getPriority();
-        $Attachments = $Message->getChildren();
-    
+    protected function getBody($Message){
+                    
+        $Email = MessageConverter::toEmail($Message->getOriginalMessage());
+
         return array_filter([
-            'subject' => $Message->getSubject(),
-            'sender' => $this->toRecipientCollection($From)[0],
-            'from' => $this->toRecipientCollection($From)[0],
-            'replyTo' => $this->toRecipientCollection($Message->getReplyTo()),
-            'toRecipients' => $this->toRecipientCollection($Message->getTo()),
-            'ccRecipients' => $this->toRecipientCollection($Message->getCc()),
-            'bccRecipients' => $this->toRecipientCollection($Message->getBcc()),
-            'importance' => $Priority === 3 ? 'Normal' : ($Priority < 3 ? 'Low' : 'High'),
-            'body' => [
-                'contentType' => Str::contains($Message->getContentType(), ['html', 'plain']) ? 'html' : 'text',
-                'content' => $Message->getBody(),
-            ],
-            'attachments' => $this->toAttachmentCollection($Attachments),            
+            'message' => [
+                'subject' => $Email->getSubject(),
+                'sender' => $this->toRecipientCollection($Email->getFrom())[0],
+                'from' => $this->toRecipientCollection($Email->getFrom())[0],
+                'replyTo' => $this->toRecipientCollection($Email->getReplyTo()),
+                'toRecipients' => $this->toRecipientCollection($Email->getTo()),
+                'ccRecipients' => $this->toRecipientCollection($Email->getCc()),
+                'bccRecipients' => $this->toRecipientCollection($Email->getBcc()),
+                'importance' => $Email->getPriority() === 3 ? 'Normal' : ($Email->getPriority() < 3 ? 'Low' : 'High'),
+                'body' => $this->getContent($Email)
+                //'attachments' => $this->toAttachmentCollection($Attachments),            
+            ]
         ]);        
     }
 
+   
     /**
      * Transforms given SimpleMessage recipients into
      * Microsoft Graph recipients collection
@@ -128,39 +77,56 @@ class MicrosoftGraphMailTransport extends Transport {
         
         $Collection = [];
 
-        // If the provided list is empty
-        // return an empty collection
-        
         if(!$Recipients){
             return $Collection;
         }
-
-        // Some fields yield single e-mail
-        // addresses instead of arrays
         
         if(is_string($Recipients)){
             
             $Collection[] = [
                 'emailAddress' => [
                     'name' => null,
-                    'address' => $Recipients,
+                    'address' => $Recipients->getAddress(),
                 ],
             ];
 
             return $Collection;
         }
 
-        foreach($Recipients as $Address => $Name){
+        foreach($Recipients as $Address){
             
             $Collection[] = [
                 'emailAddress' => [
-                    'name' => $Name,
-                    'address' => $Address,
+                    'name' => $Address->getName(),
+                    'address' => $Address->getAddress(),
                 ],
             ];
         }
 
         return $Collection;
+    }
+
+    /**
+     * @param Email $email
+     * @return array
+     */
+    private function getContent(Email $Email): array {
+        
+        if (!is_null($Email->getHtmlBody())) {
+            $Content = [
+                'contentType' => 'html',
+                'content' => $Email->getHtmlBody(),
+            ];
+        }
+
+        if (!is_null($Email->getTextBody())) {
+            $Content = [
+                'contentType' => 'text',
+                'content' => $Email->getTextBody(),
+            ];
+        }
+
+        return $Content;
     }
 
     /**
@@ -194,17 +160,13 @@ class MicrosoftGraphMailTransport extends Transport {
         return $Collection;
     }
 
+
     /**
-     * Returns header collection for API request
-     * @return string[]
-     * @throws CouldNotGetToken
-     * @throws CouldNotReachService
+     * Get the string representation of the transport.
+     *
+     * @return string
      */
-    protected function getHeaders(){
-        
-        return [
-            'Accept' => 'application/json',
-            'Authorization' => 'Bearer ' . MicrosoftGraphServiceProvider::GetAccessToken(),
-        ];
+    public function __toString(): string{
+        return 'microsoftgraph';
     }
 }
