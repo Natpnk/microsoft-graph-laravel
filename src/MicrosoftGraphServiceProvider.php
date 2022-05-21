@@ -22,11 +22,11 @@ class MicrosoftGraphServiceProvider extends ServiceProvider
         /**
          * Mail Transport
          */        
-        $this->app->get('mail.manager')->extend('microsoftgraph', function(array $Config){
-                            
+        $this->app->get('mail.manager')->extend('microsoftgraph', function(array $Config = []){
+                           
             if(!isset($Config['transport']) || !$this->app['config']->get('mail.from.address', false)){
                 throw CouldNotSendMail::invalidConfig();
-            }            
+            }
 
             return new MicrosoftGraphMailTransport($Config);
         }); 
