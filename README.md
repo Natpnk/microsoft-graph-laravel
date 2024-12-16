@@ -7,8 +7,8 @@ This laravel package contains a wrapper for Microsoft Graph with the following f
 
 ## Requirements
 
- - Laravel 8^
- - PHP 7.2.5^
+ - Laravel 10 or higher (Use version 1.1.2 for Laravel 9)
+ - PHP 8.2 or higher
 
 ## Installation
 To install and use this package follow instructions below:
@@ -36,9 +36,9 @@ The config file will be published as follow:
 	    |    
 	    */
 	      
-	    'tenant' => env('MSGRAPH_TENANT'),
-	    'clientid' => env('MSGRAPH_CLIENT_ID'),
-	    'clientsecret' => env('MSGRAPH_CLIENT_SECRET')    
+	    'tenant_id' => env('MSGRAPH_TENANT_ID'),
+	    'client_id' => env('MSGRAPH_CLIENT_ID'),
+	    'client_secret' => env('MSGRAPH_CLIENT_SECRET')    
 	];
 
 #### Step 3: Create app registration
