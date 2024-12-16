@@ -8,8 +8,8 @@ return [
     |--------------------------------------------------------------------------
     |
     */
-
-    'tenant' => env('MSGRAPH_TENANT'),
+    
+    'tenantid' => env('MSGRAPH_TENANT_ID'),
     'clientid' => env('MSGRAPH_CLIENT_ID'),
     'clientsecret' => env('MSGRAPH_CLIENT_SECRET')
 ];
