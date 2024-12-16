@@ -3,170 +3,171 @@
 namespace Natpnk\MicrosoftGraphLaravel;
 
 use MicrosoftGraph;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Str;
-
-use Symfony\Component\Mailer\Header\MetadataHeader;
 use Symfony\Component\Mailer\SentMessage;
 use Symfony\Component\Mailer\Transport\AbstractTransport;
-use Symfony\Component\Mime\Message;
-use Symfony\Component\Mime\Address;
-use Symfony\Component\Mime\Email;
-use Symfony\Component\Mime\MessageConverter;
+use Symfony\Component\Mime\{Email, Address, Message, MessageConverter};
+use Psr\Log\LoggerInterface;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
+use Natpnk\MicrosoftGraphLaravel\Exceptions\{CouldNotGetToken, CouldNotReachService};
 
-use Natpnk\MicrosoftGraphLaravel\Exceptions\CouldNotGetToken;
-use Natpnk\MicrosoftGraphLaravel\Exceptions\CouldNotReachService;
-use Natpnk\MicrosoftGraphLaravel\Exceptions\CouldNotSendMail;
-
+/**
+ * Microsoft Graph Mail Transport
+ * 
+ * This class provides an implementation of Symfony's AbstractTransport to send emails via Microsoft Graph API.
+ */
 class MicrosoftGraphMailTransport extends AbstractTransport {
-
+    
     /**
-     * The MicrosoftGraph client.
-     *
+     * Instance of the Microsoft Graph service.
+     * 
      * @var MicrosoftGraph
      */
-    protected $Graph;
+    protected MicrosoftGraph $graph;
 
     /**
-     * Create a new MicrosoftGraph transport instance.
+     * Constructor to initialize Microsoft Graph Mail Transport.
      *
-     * @param  $Config
-     * @return void
+     * @param array $config Configuration options for the transport.
+     * @param EventDispatcherInterface|null $dispatcher Optional event dispatcher.
+     * @param LoggerInterface|null $logger Optional logger.
      */
-    public function __construct(array $Config = []){
+    public function __construct(public array $config = [], ?EventDispatcherInterface $dispatcher = null, ?LoggerInterface $logger = null){
         
-        $this->Config = $Config;        
-        $this->Graph = new MicrosoftGraph;
+        $this->graph = new MicrosoftGraph;
+        parent::__construct($dispatcher, $logger);
     }
 
-    protected function doSend(SentMessage $Message): void {
-                
-        $From = $Message->getEnvelope()->getSender()->toString();
+    /**
+     * Sends the email message using Microsoft Graph API.
+     *
+     * @param SentMessage $message The email message to send.     
+     */
+    protected function doSend(SentMessage $message): void {
+        
+        $from = $message->getEnvelope()->getSender()->toString();
 
-        MicrosoftGraph::createRequest("POST", "/users/{$From}/sendmail")->attachBody($this->getBody($Message))->execute();
+        // Perform the API request to send the mail
+        MicrosoftGraph::createRequest("POST", "/users/{$from}/sendmail")->attachBody($this->getBody($message))->execute();
     }
 
-    protected function getBody($Message){
-                    
-        $Email = MessageConverter::toEmail($Message->getOriginalMessage());
+    /**
+     * Prepares the email body payload for the Microsoft Graph API.
+     *
+     * @param SentMessage $message The original message object.
+     *
+     * @return array The prepared payload for the API request.
+     */
+    protected function getBody(SentMessage $message): array {
+        
+        $email = MessageConverter::toEmail($message->getOriginalMessage());
 
         return array_filter([
             'message' => [
-                'subject' => $Email->getSubject(),
-                'sender' => $this->toRecipientCollection($Email->getFrom())[0],
-                'from' => $this->toRecipientCollection($Email->getFrom())[0],
-                'replyTo' => $this->toRecipientCollection($Email->getReplyTo()),
-                'toRecipients' => $this->toRecipientCollection($Email->getTo()),
-                'ccRecipients' => $this->toRecipientCollection($Email->getCc()),
-                'bccRecipients' => $this->toRecipientCollection($Email->getBcc()),
-                'importance' => $Email->getPriority() === 3 ? 'Normal' : ($Email->getPriority() < 3 ? 'Low' : 'High'),
-                'body' => $this->getContent($Email)
-                //'attachments' => $this->toAttachmentCollection($Attachments),            
+                'subject' => $email->getSubject(),
+                'sender' => $this->toRecipientCollection($email->getFrom())[0],
+                'from' => $this->toRecipientCollection($email->getFrom())[0],
+                'replyTo' => $this->toRecipientCollection($email->getReplyTo()),
+                'toRecipients' => $this->toRecipientCollection($email->getTo()),
+                'ccRecipients' => $this->toRecipientCollection($email->getCc()),
+                'bccRecipients' => $this->toRecipientCollection($email->getBcc()),
+                'importance' => $email->getPriority() === 3 ? 'Normal' : ($email->getPriority() < 3 ? 'Low' : 'High'),
+                'body' => $this->getContent($email),
+                'attachments' => $this->toAttachmentCollection($email->getAttachments()),           
             ]
         ]);        
     }
 
-   
     /**
-     * Transforms given SimpleMessage recipients into
-     * Microsoft Graph recipients collection
-     * @param array|string $recipients
-     * @return array
-     */
-    protected function toRecipientCollection($Recipients) {
-        
-        $Collection = [];
-
-        if(!$Recipients){
-            return $Collection;
-        }
-        
-        if(is_string($Recipients)){
-            
-            $Collection[] = [
-                'emailAddress' => [
-                    'name' => null,
-                    'address' => $Recipients->getAddress(),
-                ],
-            ];
-
-            return $Collection;
-        }
-
-        foreach($Recipients as $Address){
-            
-            $Collection[] = [
-                'emailAddress' => [
-                    'name' => $Address->getName(),
-                    'address' => $Address->getAddress(),
-                ],
-            ];
-        }
-
-        return $Collection;
-    }
-
-    /**
-     * @param Email $email
-     * @return array
-     */
-    private function getContent(Email $Email): array {
-        
-        if (!is_null($Email->getHtmlBody())) {
-            $Content = [
-                'contentType' => 'html',
-                'content' => $Email->getHtmlBody(),
-            ];
-        }
-
-        if (!is_null($Email->getTextBody())) {
-            $Content = [
-                'contentType' => 'text',
-                'content' => $Email->getTextBody(),
-            ];
-        }
-
-        return $Content;
-    }
-
-    /**
-     * Transforms given SwiftMailer children into
-     * Microsoft Graph attachment collection
-     * @param $attachments
-     * @return array
-     */
-    protected function toAttachmentCollection($Attachments){
-        
-        $Collection = [];
-
-        foreach($Attachments as $Attachment){
-            
-            if(!$Attachment instanceof Swift_Mime_Attachment){
-                continue;
-            }
-
-            $Collection[] = [
-                'name' => $Attachment->getFilename(),
-                'contentId' => $Attachment->getId(),
-                'contentType' => $Attachment->getContentType(),
-                'contentBytes' => base64_encode($Attachment->getBody()),
-                'size' => strlen($Attachment->getBody()),
-                '@odata.type' => '#microsoft.graph.fileAttachment',
-                'isInline' => $Attachment instanceof Swift_Mime_EmbeddedFile,
-            ];
-
-        }
-
-        return $Collection;
-    }
-
-
-    /**
-     * Get the string representation of the transport.
+     * Converts a recipient list into the Microsoft Graph API format.
      *
-     * @return string
+     * @param Address[]|string|null $recipients List of recipients.
+     *
+     * @return array An array of formatted recipient objects.
      */
-    public function __toString(): string{
+    protected function toRecipientCollection($recipients): array {
+        
+        $collection = [];
+
+        if(!$recipients){
+            return $collection;
+        }
+
+        foreach((array)$recipients as $recipient){
+            
+            $collection[] = [
+                'emailAddress' => [
+                    'name' => $recipient instanceof Address ? $recipient->getName() : null,
+                    'address' => $recipient instanceof Address ? $recipient->getAddress() : $recipient,
+                ],
+            ];
+        }
+
+        return $collection;
+    }
+
+    /**
+     * Extracts the content (HTML or text) from the Email object.
+     *
+     * @param Email $email The email object.
+     *
+     * @return array The content of the email.
+     */
+    private function getContent(Email $email): array {
+        
+        if($email->getHtmlBody() !== null){
+            
+            return [
+                'contentType' => 'html',
+                'content' => $email->getHtmlBody(),
+            ];
+        }
+
+        if($email->getTextBody() !== null){
+            
+            return [
+                'contentType' => 'text',
+                'content' => $email->getTextBody(),
+            ];
+        }
+
+        return [];
+    }
+
+    /**
+     * Converts attachments to the Microsoft Graph API format.
+     *
+     * @param array $attachments List of attachments.
+     *
+     * @return array The formatted attachment objects.
+     */
+    protected function toAttachmentCollection(array $attachments): array {
+        
+        $collection = [];
+
+        foreach($attachments as $attachment){
+            
+            $content = $attachment->getBody();
+
+            $collection[] = [
+                'name' => $attachment->getFilename(),
+                'contentId' => $attachment->getContentId(),
+                'contentType' => $attachment->getContentType(),
+                'contentBytes' => base64_encode($content),
+                'size' => strlen($content),
+                '@odata.type' => '#microsoft.graph.fileAttachment',
+                'isInline' => false,
+            ];
+        }
+
+        return $collection;
+    }
+
+    /**
+     * Returns a string representation of the transport name.
+     *
+     * @return string The transport identifier.
+     */
+    public function __toString(): string {
         return 'microsoftgraph';
     }
 }
