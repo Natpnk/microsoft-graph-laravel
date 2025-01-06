@@ -9,7 +9,7 @@ return [
     |
     */
     
-    'tenantid' => env('MSGRAPH_TENANT_ID'),
-    'clientid' => env('MSGRAPH_CLIENT_ID'),
-    'clientsecret' => env('MSGRAPH_CLIENT_SECRET')
+    'tenant_id' => env('MSGRAPH_TENANT_ID'),
+    'client_id' => env('MSGRAPH_CLIENT_ID'),
+    'client_secret' => env('MSGRAPH_CLIENT_SECRET')
 ];
