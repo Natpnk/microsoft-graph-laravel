@@ -3,9 +3,15 @@
 namespace Natpnk\MicrosoftGraphLaravel;
 
 use Exception;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Filesystem\FilesystemAdapter;
+use ShitwareLtd\FlysystemMsGraph\Adapter;
+use League\Flysystem\Filesystem;
 use Microsoft\Graph\Graph;
+
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\{Storage};
 use GuzzleHttp\Exception\{BadResponseException, ConnectException};
 use Natpnk\MicrosoftGraphLaravel\Exceptions\{CouldNotSendMail, CouldNotGetToken, CouldNotReachService};
 
@@ -42,6 +48,20 @@ class MicrosoftGraphServiceProvider extends ServiceProvider {
 
             return new MicrosoftGraphMailTransport($config);
         }); 
+
+        // Extend storage to support Microsoft Graph as a filesystem
+        Storage::extend('microsoft-graph', function (Application $app, array $config){
+
+            $graph = new Graph();          
+            $graph->setAccessToken(self::getAccessToken());                 
+            
+            $adapter = new Adapter($graph, $config['drive_id']);
+
+            return new FilesystemAdapter(
+                new Filesystem($adapter, $config), 
+                $adapter, $config
+            );
+        });
     }
 
     /**
@@ -58,7 +78,8 @@ class MicrosoftGraphServiceProvider extends ServiceProvider {
         // Bind Microsoft Graph client into the service container
         $this->app->bind(MicrosoftGraph::class, function (){
              
-            $graph = new Graph();            
+            $graph = new Graph();
+            
             return $graph->setAccessToken(self::getAccessToken());
         });
 
@@ -76,7 +97,7 @@ class MicrosoftGraphServiceProvider extends ServiceProvider {
      * @throws CouldNotGetToken If the API request fails.
      * @throws CouldNotReachService If there are connection or unknown errors.
      */
-    private static function getAccessToken(){
+    public static function getAccessToken(){
         
         return Cache::remember('microsoft-graph-access-token', 45, function (){
             
@@ -86,10 +107,10 @@ class MicrosoftGraphServiceProvider extends ServiceProvider {
 
                 $guzzle = new \GuzzleHttp\Client();
                 
-                $response = $guzzle->post("https://login.microsoftonline.com/{$config['tenant']}/oauth2/token?api-version=1.0", [
+                $response = $guzzle->post("https://login.microsoftonline.com/{$config['tenant_id']}/oauth2/token?api-version=1.0", [
                     'form_params' => [
-                        'client_id' => $config['clientid'],
-                        'client_secret' => $config['clientsecret'],
+                        'client_id' => $config['client_id'],
+                        'client_secret' => $config['client_secret'],
                         'resource' => 'https://graph.microsoft.com/',
                         'grant_type' => 'client_credentials',
                     ],
