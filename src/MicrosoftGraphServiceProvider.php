@@ -5,13 +5,11 @@ namespace Natpnk\MicrosoftGraphLaravel;
 use Exception;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Filesystem\FilesystemAdapter;
-use ShitwareLtd\FlysystemMsGraph\Adapter;
 use League\Flysystem\Filesystem;
 use Microsoft\Graph\Graph;
 
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\{Storage};
+use Illuminate\Support\Facades\{Cache, Storage};
 use GuzzleHttp\Exception\{BadResponseException, ConnectException};
 use Natpnk\MicrosoftGraphLaravel\Exceptions\{CouldNotSendMail, CouldNotGetToken, CouldNotReachService};
 
