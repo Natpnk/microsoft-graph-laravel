@@ -53,7 +53,7 @@ class MicrosoftGraphServiceProvider extends ServiceProvider {
             $graph = new Graph();          
             $graph->setAccessToken(self::getAccessToken());                 
             
-            $adapter = new Adapter($graph, $config['drive_id']);
+            $adapter = new MicrosoftGraphStorageAdapter($graph, $config['drive_id']);
 
             return new FilesystemAdapter(
                 new Filesystem($adapter, $config), 
