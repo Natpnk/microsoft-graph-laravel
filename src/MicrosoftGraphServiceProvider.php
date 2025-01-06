@@ -33,7 +33,7 @@ class MicrosoftGraphServiceProvider extends ServiceProvider {
         ], 'config');
         
         // Extend the mail transport to include Microsoft Graph
-        $this->app->get('mail.manager')->extend('microsoftgraph', function(array $config = []){
+        $this->app->get('mail.manager')->extend('microsoft-graph', function(array $config = []){
             
             // Ensure required configuration exists
             if(!isset($config['transport']) || !$this->app['config']->get('mail.from.address', false)){
@@ -58,8 +58,7 @@ class MicrosoftGraphServiceProvider extends ServiceProvider {
         // Bind Microsoft Graph client into the service container
         $this->app->bind(MicrosoftGraph::class, function (){
              
-            $graph = new Graph();
-            
+            $graph = new Graph();            
             return $graph->setAccessToken(self::getAccessToken());
         });
 
@@ -77,9 +76,9 @@ class MicrosoftGraphServiceProvider extends ServiceProvider {
      * @throws CouldNotGetToken If the API request fails.
      * @throws CouldNotReachService If there are connection or unknown errors.
      */
-    public static function getAccessToken(){
+    private static function getAccessToken(){
         
-        return Cache::remember('microsoftgraph-accesstoken', 45, function (){
+        return Cache::remember('microsoft-graph-access-token', 45, function (){
             
             try {
                 
