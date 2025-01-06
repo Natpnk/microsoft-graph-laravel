@@ -48,7 +48,7 @@ To obtain the Tenant, ClientID and ClientSecret. Please follow this [article](ht
 It is possible to use Microsoft Graph as an mail transport within Laravel. Add the following to config/mail.php inside your Laravel installation.
 
     'microsoftgraph' => [
-		'transport' => 'microsoftgraph',
+		'transport' => 'microsoft-graph',
 	],
 
 Additional settings are not required due to settings inside config/microsoftgraph.php. Remember to use a from address which is a valid mailbox inside your tenant.
